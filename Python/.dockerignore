@@ -1,0 +1,13 @@
+node_modules/
+yarn.lock
+package-lock.json
+*.map
+Dockerfile
+*.pyc
+*.ipynb
+__pycache__/
+.ipynb_checkpoints/
+.virtual_documents/
+test
+dist/
+build/

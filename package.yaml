@@ -1,0 +1,9 @@
+name: psy
+private: true
+version: 0.0.0
+scripts:
+  dev: sh ./scripts/dev.sh
+  install: sh ./scripts/install.sh && rm -rf ./pnpm-lock.yaml ./node_modules
+  lint: sh ./scripts/lint.sh
+  build: sh ./scripts/build.sh
+  test: sh ./scripts/test.sh

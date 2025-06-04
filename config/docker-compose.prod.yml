@@ -1,0 +1,96 @@
+name: psy-prod
+services:
+  nginx:
+    image: ghcr.io/haozi/nginx:1.27.4-alpine
+    restart: always
+    volumes:
+      - ../config/nginx.prod.conf:/etc/nginx/conf.d/default.conf
+      - ../Node.js/apps/i/dist/:/usr/share/nginx/html/i/
+    ports:
+      - 8080:80
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        order: stop-first
+    depends_on:
+      - nextjs
+      - fastapi
+
+  nextjs:
+    build:
+      context: ../Node.js/
+      dockerfile: Dockerfile
+    platform: linux/amd64
+    image: ghcr.io/haozi/psy-nextjs:${TAG:-latest}
+    restart: always
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        order: stop-first
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:63000"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
+    environment:
+      - NODE_ENV=production
+      - CI=true
+
+  fastapi:
+    build:
+      context: ../Python/
+      dockerfile: Dockerfile
+    platform: linux/amd64
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        order: stop-first
+    environment:
+      - DISABLE_DOCS=true
+    restart: always
+    image: ghcr.io/haozi/psy-fastapi:${TAG:-latest}
+
+  mysql-prod-master:
+    image: ghcr.io/haozi/mysql:9.2.0-oraclelinux9
+    restart: always
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        order: stop-first
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: psy-prod-db
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - 63306:3306
+    volumes:
+      - psy-prod-data:/var/lib/mysql:cached
+  redis:
+    image: ghcr.io/haozi/redis:7.4.2-alpine
+    ports:
+      - 56379:6379
+
+volumes:
+  psy-prod-data:

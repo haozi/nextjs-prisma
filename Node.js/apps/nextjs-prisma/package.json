@@ -1,0 +1,29 @@
+{
+  "name": "www",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "pnpm run migrate:deploy && next build",
+    "dev": "next dev --port ${PORT-63000}",
+    "generate": "prisma generate",
+    "postinstall": "pnpm run generate",
+    "migrate:deploy": "prisma migrate deploy",
+    "migrate:dev": "prisma migrate dev",
+    "migrate:status": "prisma migrate status",
+    "start": "next start --port ${PORT-63000}"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.8.2",
+    "next": "^15.3.3",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "swr": "^2.3.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.29",
+    "@types/react": "^19.1.6",
+    "prisma": "^6.8.2",
+    "typescript": "^5.8.3"
+  },
+  "packageManager": "pnpm@10.11.0"
+}

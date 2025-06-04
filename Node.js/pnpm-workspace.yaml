@@ -1,0 +1,10 @@
+packages:
+  - packages/*
+  - apps/*
+  - '!apps/demo'
+  - '!apps/i'
+onlyBuiltDependencies:
+  - '@prisma/client'
+  - '@prisma/engines'
+  - prisma
+  - sharp

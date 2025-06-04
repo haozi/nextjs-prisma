@@ -1,0 +1,13 @@
+# Ignore artifacts:
+.git
+build
+coverage
+dist
+.next
+out
+node_modules
+package-lock.json
+pnpm-lock.yaml
+pnpm-workspace.yaml
+apps/taro-app/src/index.html
+psy-data-backup/

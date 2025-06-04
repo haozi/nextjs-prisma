@@ -1,0 +1,12 @@
+services:
+  fastapi:
+    image: registry.cn-hangzhou.aliyuncs.com/psy-system/psy-fastapi:dev-latest
+  nginx:
+    image: registry.cn-hangzhou.aliyuncs.com/psy-system/nginx:1.27.4-alpine
+
+  postgres-local-test-master:
+    image: registry.cn-hangzhou.aliyuncs.com/psy-system/postgres:17.5-bookworm
+  redis:
+    image: registry.cn-hangzhou.aliyuncs.com/psy-system/redis:7.4.2-alpine
+  # phpmyadmin:
+  #   image: registry.cn-hangzhou.aliyuncs.com/psy-system/phpmyadmin:5.2.2-apache

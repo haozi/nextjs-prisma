@@ -1,0 +1,14 @@
+[phases.setup]
+nixPkgs = ["nodejs_22", "openssl", "pnpm-9_x"]
+
+[phases.install]
+cmds = [
+  "npm install -g corepack && corepack enable",
+  "pnpm install"
+]
+
+[phases.build]
+cmds = ["pnpm run build"]
+
+[start]
+cmd = "pnpm run start"
