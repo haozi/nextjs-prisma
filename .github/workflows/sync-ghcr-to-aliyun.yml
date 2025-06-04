@@ -1,0 +1,43 @@
+name: Sync All GHCR to Aliyun
+
+on:
+  schedule:
+    - cron: "0 1 * * *" # 每天 1 点（东八区）
+  workflow_dispatch: # 允许手动触发
+
+jobs:
+  sync-images:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 设置时区为上海
+        run: sudo timedatectl set-timezone Asia/Shanghai
+
+      - name: 登录 GitHub Container Registry (GHCR)
+        run: echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: 登录阿里云容器镜像服务 (ACR)
+        run: echo "${{ secrets.ALIYUN_DOCKER_PAT }}" | docker login registry.cn-hangzhou.aliyuncs.com -u "${{ secrets.ALIYUN_ACTOR }}" --password-stdin
+
+      - name: 获取 GHCR 下的所有镜像
+        run: |
+          REPO_OWNER=${{ github.actor }}
+          AUTH_HEADER="Authorization: Bearer ${{ secrets.GHCR_PAT }}"
+          IMAGES=$(curl -s -H "$AUTH_HEADER" "https://ghcr.io/v2/repositories/$REPO_OWNER" | jq -r '.[].name')
+          echo "IMAGES=$IMAGES" >> $GITHUB_ENV
+
+      - name: 遍历并同步所有镜像
+        run: |
+          for IMAGE in $IMAGES; do
+            TAGS=$(curl -s -H "Authorization: Bearer ${{ secrets.GHCR_PAT }}" "https://ghcr.io/v2/$REPO_OWNER/$IMAGE/tags/list" | jq -r '.tags[]')
+            for TAG in $TAGS; do
+              SRC_IMAGE="ghcr.io/$REPO_OWNER/$IMAGE:$TAG"
+              DEST_IMAGE="registry.cn-hangzhou.aliyuncs.com/psy-system/$IMAGE:$TAG"
+              echo "同步镜像: $SRC_IMAGE -> $DEST_IMAGE"
+              docker pull $SRC_IMAGE
+              docker tag $SRC_IMAGE $DEST_IMAGE
+              docker push $DEST_IMAGE
+            done
+          done
+
+      - name: 退出 Docker 登录
+        run: docker logout ghcr.io && docker logout registry.cn-hangzhou.aliyuncs.com

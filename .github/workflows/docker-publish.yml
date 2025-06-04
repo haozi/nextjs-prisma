@@ -1,0 +1,115 @@
+name: Build and Push Docker Compose App to GHCR
+
+on:
+  push:
+    branches:
+      - main
+      - "feature/**"
+      - "fix/**"
+      - "bugfix/**"
+      - "hotfix/**"
+    paths-ignore:
+      - "**/*.md"
+  release:
+    types: [created]
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set timezone to Asia/Shanghai
+        run: echo "TZ=Asia/Shanghai" >> $GITHUB_ENV
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        run: |
+          npm i -g pnpm@10.7.0
+
+      - name: Setup Node Cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+          cache-dependency-path: "./Node.js/pnpm-lock.yaml"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Set up Environment Variables
+        run: |
+          echo "MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}" >> $GITHUB_ENV
+          echo "MYSQL_USER=${{ secrets.MYSQL_USER }}" >> $GITHUB_ENV
+          echo "MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}" >> $GITHUB_ENV
+
+      # 登录 GitHub Container Registry (GHCR)
+      - name: Login to GitHub Container Registry
+        run: echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      # 设置镜像标签（用于 GHCR）
+      - name: Set Image Tag
+        run: |
+          TIMESTAMP=$(date +'%Y-%m-%d_%H-%M-%S')
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            IMAGE_TAG="release-${TIMESTAMP}"
+          else
+            IMAGE_TAG="dev-latest"
+          fi
+          echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
+
+      - name: Install dependencies and build project
+        run: |
+          cd ./Node.js/ && pnpm install && cd ..
+
+      - name: Build and push `date` tag
+        run: |
+          TAG=${{ env.IMAGE_TAG }} sh ./scripts/build.sh
+          TAG=${{ env.IMAGE_TAG }} sh ./scripts/push.sh
+
+      - name: Build and push `latest` tag
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            TAG=latest sh ./scripts/build.sh --skip-build-app-i
+            TAG=latest sh ./scripts/push.sh
+          else
+            echo "Skipping push for non-main branch."
+          fi
+
+      - name: Build and push `dev-latest` tag
+        run: |
+          TAG="dev-latest" docker compose -f ./config/docker-compose.dev.yml build
+          TAG="dev-atest" docker compose -f ./config/docker-compose.dev.yml push
+
+      - name: Copy to Aliyun
+        run: |
+          echo "${{ secrets.ALIYUN_DOCKER_PAT }}" | docker login registry.cn-hangzhou.aliyuncs.com -u  "${{ secrets.ALIYUN_ACTOR }}" --password-stdin
+          IMAGES=$(docker compose -f ./config/docker-compose.prod.yml config | awk '/image:/ {print $2}' |  awk -F: '{print $1}')
+          ALIYUN_REGISTRY="registry.cn-hangzhou.aliyuncs.com/psy-system"
+
+
+          for IMAGE in $IMAGES; do
+            echo "Processing $IMAGE..."
+            docker pull --disable-content-trust $IMAGE
+
+            IMAGE_NAME=$(echo $IMAGE | awk -F '/' '{print $NF}')
+            ALIYUN_IMAGE="$ALIYUN_REGISTRY/$IMAGE_NAME"
+
+            if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+              docker tag $IMAGE:latest $ALIYUN_IMAGE:latest
+              docker push $ALIYUN_IMAGE:latest
+              if docker inspect --type=image $IMAGE:${{env.IMAGE_TAG}} >/dev/null 2>&1; then
+                docker tag $IMAGE:${{env.IMAGE_TAG}} $ALIYUN_IMAGE:${{env.IMAGE_TAG}}
+                docker push $ALIYUN_IMAGE:${{env.IMAGE_TAG}}
+              else
+                echo "Image $IMAGE:${{env.IMAGE_TAG}} not found locally, skipping push."
+              fi
+            fi
+
+            if docker inspect --type=image $IMAGE:dev-latest >/dev/null 2>&1; then
+              docker tag $IMAGE:dev-latest $ALIYUN_IMAGE:dev-latest
+              docker push $ALIYUN_IMAGE:dev-latest
+            fi
+          done
+          echo "All images synced to Aliyun ACR!"
